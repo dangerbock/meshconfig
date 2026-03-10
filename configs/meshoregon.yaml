@@ -23,6 +23,28 @@ config:
     usePreset: false
 
 module_config:
+  mqtt:
+    address: mqtt.meshtastic.org
+    username: meshdev
+    password: large4cats
+    encryptionEnabled: true
+    root: msh/US
+  serial: {}
+  externalNotification: {}
+  storeForward: {}
+  rangeTest: {}
+  telemetry:
+    deviceUpdateInterval: 2147483647
+  cannedMessage:
+    enabled: true
+  audio: {}
+  remoteHardware: {}
+  neighborInfo: {}
+  ambientLighting: {}
+  detectionSensor:
+    minimumBroadcastSecs: 45
+    detectionTriggerType: LOGIC_HIGH
+  paxcounter: {}
 channels:
   - settings:
       psk: AQ==
