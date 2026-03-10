@@ -885,14 +885,16 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
-function formatDiffValue(value) {
+function formatDiffValue(value, path = "") {
   if (value === undefined) {
     return '<span class="diff-value diff-value--empty">missing</span>';
   }
 
-  const pretty = typeof value === "string"
-    ? JSON.stringify(value)
-    : JSON.stringify(value, null, 2);
+  const pretty = path === "channels" || path.startsWith("channels.")
+    ? dumpYaml(value).trimEnd()
+    : typeof value === "string"
+      ? JSON.stringify(value)
+      : JSON.stringify(value, null, 2);
   return `<pre class="diff-value">${escapeHtml(pretty)}</pre>`;
 }
 
@@ -949,11 +951,11 @@ function renderDiff(target, badge, changes, idleText) {
           <div class="diff-entry__grid">
             <div class="diff-side">
               <div class="diff-label">Live</div>
-              ${formatDiffValue(change.actual)}
+              ${formatDiffValue(change.actual, change.path)}
             </div>
             <div class="diff-side">
               <div class="diff-label">Desired</div>
-              ${formatDiffValue(change.desired)}
+              ${formatDiffValue(change.desired, change.path)}
             </div>
           </div>
         </section>
