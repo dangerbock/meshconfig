@@ -998,7 +998,7 @@ function diffDesiredAgainstLive(actual, desired, path = "root", changes = []) {
   return changes;
 }
 
-function compareLiveAndDesired({ updateEditor = false } = {}) {
+function compareLiveAndDesired({ updateEditor = true } = {}) {
   if (!state.liveConfig) {
     throw new Error("Download the live config first.");
   }
