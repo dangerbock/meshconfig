@@ -11,9 +11,6 @@ config:
     positionFlags: 811
     broadcastSmartMinimumDistance: 100
     broadcastSmartMinimumIntervalSecs: 900
-  power: {}
-  network: {}
-  display: {}
   lora:
     bandwidth: 125
     spreadFactor: 8
@@ -26,17 +23,6 @@ config:
     usePreset: false
 
 module_config:
-  serial: {}
-  externalNotification: {}
-  storeForward: {}
-  rangeTest: {}
-  telemetry: {}
-  cannedMessage: {}
-  audio: {}
-  remoteHardware: {}
-  neighborInfo: {}
-  ambientLighting: {}
-  paxcounter: {}
 channels:
   - settings:
       psk: AQ==
@@ -49,7 +35,6 @@ channels:
     settings:
       psk: BQ==
       name: Local
-      moduleSettings: {}
     role: SECONDARY
   - index: 2
     settings: {}
