@@ -3,25 +3,17 @@
 is_unmessagable: false
 config:
   device:
-    nodeInfoBroadcastSecs: 10800
-    tzdef: PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00
+    nodeInfoBroadcastSecs: 43200
   position:
-    positionBroadcastSecs: 3600
+    positionBroadcastSecs: 86400
     positionBroadcastSmartEnabled: true
     gpsUpdateInterval: 120
     positionFlags: 811
     broadcastSmartMinimumDistance: 100
-    broadcastSmartMinimumIntervalSecs: 300
-    gpsMode: NOT_PRESENT
-  power:
-    waitBluetoothSecs: 60
-    sdsSecs: 4294967295
-    lsSecs: 300
-    minWakeSecs: 10
-  network:
-    ntpServer: meshtastic.pool.ntp.org
-  display:
-    screenOnSecs: 600
+    broadcastSmartMinimumIntervalSecs: 900
+  power: {}
+  network: {}
+  display: {}
   lora:
     bandwidth: 125
     spreadFactor: 8
@@ -29,7 +21,6 @@ config:
     region: US
     hopLimit: 7
     txEnabled: true
-    txPower: 30
     sx126xRxBoostedGain: true
     overrideFrequency: 918.5
     usePreset: false
@@ -39,10 +30,8 @@ module_config:
   externalNotification: {}
   storeForward: {}
   rangeTest: {}
-  telemetry:
-    deviceUpdateInterval: 2147483647
-  cannedMessage:
-    enabled: true
+  telemetry: {}
+  cannedMessage: {}
   audio: {}
   remoteHardware: {}
   neighborInfo: {}
