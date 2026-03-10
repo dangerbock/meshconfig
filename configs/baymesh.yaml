@@ -1,0 +1,54 @@
+# BayMesh starter preset.
+# The app replaces owner and owner_short with the live node values only when those fields are missing.
+# This preset is biased toward a personal/chat node:
+# - hopLimit 6 for general BayMesh participation
+# - 6 hour automatic beacons to reduce background traffic
+# - smart position enabled with a 10 minute / 100 meter floor
+# Optional items from BayMesh guidance, such as MQTT uplink/downlink behavior
+# and device role selection, are left for the operator to set explicitly if needed.
+is_unmessagable: false
+location: null
+config:
+  device:
+    nodeInfoBroadcastSecs: 21600
+  position:
+    positionBroadcastSecs: 21600
+    positionBroadcastSmartEnabled: true
+    gpsUpdateInterval: 120
+    positionFlags: 811
+    broadcastSmartMinimumDistance: 100
+    broadcastSmartMinimumIntervalSecs: 600
+  lora:
+    usePreset: true
+    modemPreset: MEDIUM_FAST
+    bandwidth: 250
+    spreadFactor: 10
+    codingRate: 5
+    region: US
+    hopLimit: 6
+    channelNum: 45
+    txEnabled: true
+    sx126xRxBoostedGain: true
+module_config:
+  telemetry:
+    deviceUpdateInterval: 21600
+channels:
+  - settings:
+      psk: AQ==
+      moduleSettings: {}
+    role: PRIMARY
+    index: 0
+  - index: 1
+    settings: {}
+  - index: 2
+    settings: {}
+  - index: 3
+    settings: {}
+  - index: 4
+    settings: {}
+  - index: 5
+    settings: {}
+  - index: 6
+    settings: {}
+  - index: 7
+    settings: {}

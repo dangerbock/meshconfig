@@ -424,6 +424,31 @@ function log(message) {
   elements.log.textContent = `[${now}] ${message}\n${elements.log.textContent}`;
 }
 
+function scrollPageTo(top) {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+
+  const scroller = document.scrollingElement ?? document.documentElement;
+  window.scrollTo({ top, behavior: "smooth" });
+  scroller.scrollTo?.({ top, behavior: "smooth" });
+
+  // Enforce the final position after layout settles.
+  setTimeout(() => {
+    window.scrollTo(0, top);
+    scroller.scrollTop = top;
+    document.body.scrollTop = top;
+  }, 300);
+}
+
+function scrollToPageBottom() {
+  scrollPageTo(Math.max(document.body.scrollHeight, document.documentElement.scrollHeight));
+}
+
+function scrollToPageTop() {
+  scrollPageTo(0);
+}
+
 function presetLabelFromPath(path) {
   const filename = decodeURIComponent(path.split("/").pop() ?? path).replace(/\.[^.]+$/, "");
   if (filename.toLowerCase() === "meshoregon") {
@@ -604,6 +629,24 @@ function isObject(value) {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+function isEffectivelyEmpty(value) {
+  if (value == null) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (!isObject(value)) {
+    return false;
+  }
+
+  const entries = Object.entries(value).filter(([, entry]) => entry !== undefined);
+  if (!entries.length) {
+    return true;
+  }
+  return entries.every(([, entry]) => isEffectivelyEmpty(entry));
+}
+
 function deepClone(value) {
   return value == null ? value : structuredClone(value);
 }
@@ -695,6 +738,38 @@ function dumpYaml(documentValue) {
     noRefs: true,
     sortKeys: false,
   });
+}
+
+function orderDesiredDocument(documentValue) {
+  if (!isObject(documentValue)) {
+    return documentValue;
+  }
+
+  const preferredOrder = [
+    "owner",
+    "owner_short",
+    "is_licensed",
+    "is_unmessagable",
+    "location",
+    "config",
+    "module_config",
+    "channels",
+    "canned_messages",
+    "ringtone",
+  ];
+
+  const ordered = {};
+  for (const key of preferredOrder) {
+    if (key in documentValue) {
+      ordered[key] = documentValue[key];
+    }
+  }
+  for (const [key, value] of Object.entries(documentValue)) {
+    if (!(key in ordered)) {
+      ordered[key] = value;
+    }
+  }
+  return ordered;
 }
 
 function parseDesiredYaml() {
@@ -825,11 +900,12 @@ function scheduleLivePreview() {
 }
 
 function setDesiredConfig(config, { preserveTextarea = false } = {}) {
-  state.desiredConfig = config;
+  const orderedConfig = orderDesiredDocument(config);
+  state.desiredConfig = orderedConfig;
   if (!preserveTextarea) {
-    elements.desiredYaml.value = dumpYaml(config);
+    elements.desiredYaml.value = dumpYaml(orderedConfig);
   }
-  elements.desiredMeta.textContent = config ? "Parsed and ready" : "Editable";
+  elements.desiredMeta.textContent = orderedConfig ? "Parsed and ready" : "Editable";
   setControls();
 }
 
@@ -841,10 +917,10 @@ function applyLiveNamesToDesired(desired) {
     return desired;
   }
 
-  if (longName) {
+  if (longName && (desired.owner == null || desired.owner === "")) {
     desired.owner = longName;
   }
-  if (shortName) {
+  if (shortName && (desired.owner_short == null || desired.owner_short === "")) {
     desired.owner_short = shortName;
   }
 
@@ -864,8 +940,8 @@ function syncDesiredNamesFromLive() {
   }
 
   setDesiredConfig(applyLiveNamesToDesired(desired));
-  elements.desiredMeta.textContent = "Preset loaded with live node names";
-  log("Filled desired config owner names from the downloaded node config.");
+  elements.desiredMeta.textContent = "Preset loaded with live node names where missing";
+  log("Filled missing desired config owner names from the downloaded node config.");
 }
 
 function getEffectiveDesiredConfig({ updateEditor = false } = {}) {
@@ -900,6 +976,10 @@ function formatDiffValue(value, path = "") {
 
 function serializeDiffPart(value) {
   return value === undefined ? "__undefined__" : JSON.stringify(value);
+}
+
+function valuesDiffer(actual, desired) {
+  return serializeDiffPart(actual) !== serializeDiffPart(desired);
 }
 
 function dedupeDiffChanges(changes) {
@@ -998,6 +1078,89 @@ function diffDesiredAgainstLive(actual, desired, path = "root", changes = []) {
     changes.push({ kind, path, actual, desired });
   }
   return changes;
+}
+
+function buildUploadDelta(liveConfig, desired) {
+  const live = normalizeExportDocument(liveConfig, { applyBooleanDefaults: true });
+  const delta = {};
+
+  const ownerKeys = ["owner", "owner_short", "is_licensed", "is_unmessagable"];
+  for (const key of ownerKeys) {
+    if (desired[key] !== undefined && valuesDiffer(live[key], desired[key])) {
+      delta[key] = desired[key];
+    }
+  }
+
+  if (desired.location !== undefined && valuesDiffer(live.location, desired.location)) {
+    delta.location = desired.location;
+  }
+
+  if (isObject(desired.config)) {
+    const configDelta = {};
+    for (const [sectionName, sectionValue] of Object.entries(desired.config)) {
+      if (valuesDiffer(live.config?.[sectionName], sectionValue)) {
+        configDelta[sectionName] = sectionValue;
+      }
+    }
+    if (Object.keys(configDelta).length) {
+      delta.config = configDelta;
+    }
+  }
+
+  if (isObject(desired.module_config)) {
+    const moduleConfigDelta = {};
+    for (const [sectionName, sectionValue] of Object.entries(desired.module_config)) {
+      if (valuesDiffer(live.module_config?.[sectionName], sectionValue)) {
+        moduleConfigDelta[sectionName] = sectionValue;
+      }
+    }
+    if (Object.keys(moduleConfigDelta).length) {
+      delta.module_config = moduleConfigDelta;
+    }
+  }
+
+  if (Array.isArray(desired.channels)) {
+    const changedChannels = [];
+    const liveChannels = new Map((live.channels ?? []).map((channel) => [channel.index, channel]));
+    for (let index = 0; index < desired.channels.length; index += 1) {
+      const desiredChannel = desired.channels[index];
+      const desiredIndex = desiredChannel.index ?? index;
+      if (valuesDiffer(liveChannels.get(desiredIndex), desiredChannel)) {
+        changedChannels.push({ ...desiredChannel, index: desiredIndex });
+      }
+    }
+    if (changedChannels.length) {
+      delta.channels = changedChannels;
+    }
+  }
+
+  if (
+    desired.canned_messages !== undefined &&
+    valuesDiffer(live.canned_messages, desired.canned_messages)
+  ) {
+    delta.canned_messages = desired.canned_messages;
+  }
+
+  if (desired.ringtone !== undefined && valuesDiffer(live.ringtone, desired.ringtone)) {
+    delta.ringtone = desired.ringtone;
+  }
+
+  return delta;
+}
+
+function hasUploadDelta(delta) {
+  return [
+    delta.owner,
+    delta.owner_short,
+    delta.is_licensed,
+    delta.is_unmessagable,
+    delta.location,
+    delta.config,
+    delta.module_config,
+    delta.channels,
+    delta.canned_messages,
+    delta.ringtone,
+  ].some((value) => value !== undefined);
 }
 
 function compareLiveAndDesired({ updateEditor = true } = {}) {
@@ -1445,7 +1608,7 @@ async function requestRingtone() {
   }
 }
 
-async function downloadLiveConfig() {
+async function downloadLiveConfig({ scrollToTopOnCoreRender = false } = {}) {
   if (!state.connected || !state.device) {
     throw new Error("Connect to a node first.");
   }
@@ -1468,6 +1631,9 @@ async function downloadLiveConfig() {
   await waitForConfigured();
   log("Configure sync completed. Rendering core config immediately.");
   setLiveConfig(buildLiveConfigSnapshot(), `Core config loaded. ${getSyncProgressSummary()}`);
+  if (scrollToTopOnCoreRender) {
+    scrollToPageTop();
+  }
   syncDesiredNamesFromLive();
   tryAutoCompare("the selected desired config");
   log("Requesting optional canned messages and ringtone.");
@@ -1548,6 +1714,9 @@ async function writeConfigTree(config) {
   }
 
   for (const [sectionName, sectionValue] of Object.entries(config)) {
+    if (isEffectivelyEmpty(sectionValue)) {
+      continue;
+    }
     const message = toProtoMessage(Protobuf.Config.ConfigSchema, { [sectionName]: sectionValue });
     await sendAdmin(
       {
@@ -1566,6 +1735,9 @@ async function writeModuleConfigTree(moduleConfig) {
   }
 
   for (const [sectionName, sectionValue] of Object.entries(moduleConfig)) {
+    if (isEffectivelyEmpty(sectionValue)) {
+      continue;
+    }
     const message = toProtoMessage(Protobuf.ModuleConfig.ModuleConfigSchema, {
       [sectionName]: sectionValue,
     });
@@ -1637,6 +1809,13 @@ async function uploadDesiredConfig() {
   }
 
   const desired = getEffectiveDesiredConfig({ updateEditor: true });
+  const delta = buildUploadDelta(state.liveConfig, desired);
+
+  if (!hasUploadDelta(delta)) {
+    log("Upload skipped. Desired config already matches the live node.");
+    setStatus("Connected", "success");
+    return;
+  }
 
   setStatus("Uploading config", "warn");
   log("Beginning settings transaction.");
@@ -1652,13 +1831,13 @@ async function uploadDesiredConfig() {
   );
 
   try {
-    await writeOwner(desired);
-    await writeLocation(desired.location);
-    await writeConfigTree(desired.config);
-    await writeModuleConfigTree(desired.module_config);
-    await writeChannels(desired.channels);
-    await writeCannedMessages(desired.canned_messages);
-    await writeRingtone(desired.ringtone);
+    await writeOwner(delta);
+    await writeLocation(delta.location);
+    await writeConfigTree(delta.config);
+    await writeModuleConfigTree(delta.module_config);
+    await writeChannels(delta.channels);
+    await writeCannedMessages(delta.canned_messages);
+    await writeRingtone(delta.ringtone);
 
     await sendAdmin(
       {
@@ -1673,8 +1852,12 @@ async function uploadDesiredConfig() {
     throw error;
   }
 
+  log("Upload complete. Waiting 15 seconds for node reboot.");
+  await sleep(15000);
+  log("Refreshing live config.");
+  await downloadLiveConfig({ scrollToTopOnCoreRender: true });
+  compareLiveAndDesired();
   setStatus("Connected", "success");
-  log("Upload complete.");
 }
 
 async function connect() {
@@ -1814,6 +1997,7 @@ elements.copyLiveBtn.addEventListener("click", () => {
 });
 elements.uploadBtn.addEventListener("click", () =>
   withTask(async () => {
+    scrollToPageBottom();
     compareLiveAndDesired();
     await uploadDesiredConfig();
   }),
