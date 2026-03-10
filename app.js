@@ -2,6 +2,9 @@ import { create, fromBinary, fromJson, toBinary, toJson } from "https://esm.sh/@
 import { MeshDevice, Protobuf } from "https://esm.sh/jsr/@meshtastic/core@2.6.6";
 import yaml from "https://esm.sh/js-yaml@4.1.0";
 
+const CURRENT_DIFF_IDLE_TEXT = "Download the live config and compare it with your desired YAML.";
+const CURRENT_DIFF_EDIT_DELAY_MS = 250;
+
 function createToDeviceStream() {
   return new TransformStream({
     transform(chunk, controller) {
@@ -379,6 +382,7 @@ const elements = {
   desiredMeta: document.getElementById("desiredMeta"),
   currentDiff: document.getElementById("currentDiff"),
   currentDiffBadge: document.getElementById("currentDiffBadge"),
+  refreshDiffBtn: document.getElementById("refreshDiffBtn"),
   log: document.getElementById("log"),
   clearLogBtn: document.getElementById("clearLogBtn"),
 };
@@ -408,6 +412,7 @@ const state = {
   myNodeWaiters: [],
   configureWaiters: [],
   livePreviewTimer: null,
+  currentDiffTimer: null,
 };
 
 function sleep(ms) {
@@ -542,6 +547,7 @@ function setControls() {
   elements.copyLiveBtn.disabled = !state.liveConfig;
   elements.uploadBtn.disabled = !state.connected || !elements.desiredYaml.value.trim();
   elements.downloadLiveBtn.disabled = !state.liveConfig;
+  elements.refreshDiffBtn.disabled = !state.liveConfig || !elements.desiredYaml.value.trim();
 }
 
 function updateConnectionFields() {
@@ -957,6 +963,11 @@ function renderDiff(target, badge, changes, idleText) {
   badge.textContent = `${renderedChanges.length} change${renderedChanges.length === 1 ? "" : "s"}`;
 }
 
+function setCurrentDiffState(bodyText, badgeText) {
+  elements.currentDiff.textContent = bodyText;
+  elements.currentDiffBadge.textContent = badgeText;
+}
+
 function diffDesiredAgainstLive(actual, desired, path = "root", changes = []) {
   if (desired === undefined) {
     return changes;
@@ -987,11 +998,11 @@ function diffDesiredAgainstLive(actual, desired, path = "root", changes = []) {
   return changes;
 }
 
-function compareLiveAndDesired() {
+function compareLiveAndDesired({ updateEditor = false } = {}) {
   if (!state.liveConfig) {
     throw new Error("Download the live config first.");
   }
-  const desired = getEffectiveDesiredConfig({ updateEditor: true });
+  const desired = getEffectiveDesiredConfig({ updateEditor });
   const changes = diffDesiredAgainstLive(
     normalizeExportDocument(state.liveConfig, { applyBooleanDefaults: true }),
     desired,
@@ -1000,10 +1011,47 @@ function compareLiveAndDesired() {
     elements.currentDiff,
     elements.currentDiffBadge,
     changes,
-    "Download the live config and compare it with your desired YAML.",
+    CURRENT_DIFF_IDLE_TEXT,
   );
   setControls();
   return desired;
+}
+
+function refreshCurrentDiff({ showParseState = true } = {}) {
+  if (!state.liveConfig) {
+    setCurrentDiffState(CURRENT_DIFF_IDLE_TEXT, "No comparison yet");
+    return false;
+  }
+
+  const source = elements.desiredYaml.value.trim();
+  if (!source) {
+    setCurrentDiffState(CURRENT_DIFF_IDLE_TEXT, "No comparison yet");
+    return false;
+  }
+
+  try {
+    compareLiveAndDesired({ updateEditor: false });
+    return true;
+  } catch (error) {
+    if (showParseState) {
+      setCurrentDiffState(
+        `Desired YAML is not valid yet.\n\n${error?.message ?? error}`,
+        "Invalid YAML",
+      );
+    }
+    return false;
+  }
+}
+
+function scheduleCurrentDiffRefresh() {
+  if (state.currentDiffTimer) {
+    clearTimeout(state.currentDiffTimer);
+  }
+
+  state.currentDiffTimer = setTimeout(() => {
+    state.currentDiffTimer = null;
+    refreshCurrentDiff();
+  }, CURRENT_DIFF_EDIT_DELAY_MS);
 }
 
 function downloadText(filename, content) {
@@ -1109,6 +1157,10 @@ function resetConnectionState() {
   if (state.livePreviewTimer) {
     clearTimeout(state.livePreviewTimer);
     state.livePreviewTimer = null;
+  }
+  if (state.currentDiffTimer) {
+    clearTimeout(state.currentDiffTimer);
+    state.currentDiffTimer = null;
   }
   updateNodeSummary();
 }
@@ -1755,7 +1807,7 @@ elements.copyLiveBtn.addEventListener("click", () => {
     elements.currentDiff,
     elements.currentDiffBadge,
     [],
-    "Download the live config and compare it with your desired YAML.",
+    CURRENT_DIFF_IDLE_TEXT,
   );
 });
 elements.uploadBtn.addEventListener("click", () =>
@@ -1784,6 +1836,10 @@ elements.desiredFile.addEventListener("change", async (event) => {
 elements.desiredYaml.addEventListener("input", () => {
   elements.desiredMeta.textContent = "Edited locally";
   setControls();
+  scheduleCurrentDiffRefresh();
+});
+elements.refreshDiffBtn.addEventListener("click", () => {
+  refreshCurrentDiff();
 });
 elements.clearLogBtn.addEventListener("click", () => {
   elements.log.textContent = "";

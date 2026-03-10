@@ -141,7 +141,12 @@
             <p class="panel__kicker">Diff</p>
             <h2>Current diff</h2>
           </div>
-          <div class="diff-badge" id="currentDiffBadge">No comparison yet</div>
+          <div class="panel__tools">
+            <button id="refreshDiffBtn" class="button button--ghost" type="button" disabled>
+              Refresh diff
+            </button>
+            <div class="diff-badge" id="currentDiffBadge">No comparison yet</div>
+          </div>
         </div>
         <div id="currentDiff" class="diff-output">Download the live config and compare it with your desired YAML.</div>
       </section>
