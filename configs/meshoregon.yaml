@@ -30,7 +30,7 @@ module_config:
     enabled: false
   neighborInfo:
     enabled: false
-  paxCounter:
+  paxcounter:
     enabled: false
 channels:
   - settings:
