@@ -17,8 +17,8 @@
     <main class="shell">
       <header class="hero">
         <div class="hero__copy">
-          <p class="eyebrow">Meshtastic Config</p>
-          <h1>Download, diff, push.</h1>
+          <p class="eyebrow" data-i18n="header.title">Meshtastic Config</p>
+          <h1 data-i18n="header.punchline">Download, diff, push.</h1>
           <p class="lede">
             Connect to a node, export the writable config, compare it to the YAML
             you want, and upload changes back to the device.
@@ -178,5 +178,18 @@
     </footer>
 
     <script type="module" src="./app.js"></script>
+    
+    <!-- i18n system -->
+    <script src="i18n.js"></script>
+    <script>
+      async function start() {
+        await i18n.init({ path: "./i18n", fallback: "en" });
+      }
+
+      function setLang(lang) {
+        i18n.setLang(lang);
+      }
+      start();
+    </script>
   </body>
 </html>
