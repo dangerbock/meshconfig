@@ -4,7 +4,7 @@ const i18n = (() => {
   let currentLang = "en";
   let fallbackLang = "en";
   let path = "/i18n"; // folder where JSON files live
-  const supportedLangs = ["en", "pt"];
+  const supportedLangs = ["en", "pt", "es"]; // adjust as needed
 
   // Normalize language code
   function normalizeLang(lang) {
